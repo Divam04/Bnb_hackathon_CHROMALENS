@@ -1,6 +1,8 @@
 class ChromaLensPopup {
     constructor() {
         this.cache = new Map();
+        this.speechEnabled = true;
+        this.synth = window.speechSynthesis;
         this.init();
     }
 
@@ -13,6 +15,9 @@ class ChromaLensPopup {
             inspectorColorName: document.getElementById('inspector-color-name'),
             inspectorColorHex: document.getElementById('inspector-color-hex'),
 
+            // Speech
+            speechEnabledCheckbox: document.getElementById('speech-enabled'),
+
             // General
             errorMessage: document.getElementById('error-message'),
         };
@@ -22,6 +27,7 @@ class ChromaLensPopup {
 
     addEventListeners() {
         this.ui.activateInspectorBtn.addEventListener('click', () => this.runInspector());
+        this.ui.speechEnabledCheckbox.addEventListener('change', (e) => this.toggleSpeech(e.target.checked));
     }
 
     // --- COLOR INSPECTOR LOGIC ---
@@ -94,6 +100,11 @@ class ChromaLensPopup {
         this.ui.inspectorColorName.textContent = name;
         this.ui.inspectorColorHex.textContent = hex.toUpperCase();
         this.hideError();
+        
+        // Speak the color name if speech is enabled and it's not "Identifying..."
+        if (this.speechEnabled && name !== 'Identifying...' && name !== 'Unknown Color') {
+            this.speakColorName(name);
+        }
     }
 
     displayColorInfoSilent({ name, hex }) {
@@ -148,6 +159,118 @@ class ChromaLensPopup {
 
     hideError() {
         this.ui.errorMessage.classList.add('hidden');
+    }
+
+    // --- SPEECH SYNTHESIS LOGIC ---
+
+    speakColorName(colorName) {
+        try {
+            // Cancel any ongoing speech
+            this.synth.cancel();
+
+            // Create speech utterance
+            const utterance = new SpeechSynthesisUtterance(colorName);
+            
+            // Configure speech settings for cross-platform compatibility
+            utterance.volume = 0.8;
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.lang = 'en-US';
+
+            // Try to select a good voice
+            this.selectBestVoice(utterance);
+
+            // Handle speech events
+            utterance.onstart = () => {
+                console.log('Speaking:', colorName);
+            };
+
+            utterance.onerror = (event) => {
+                console.warn('Speech synthesis error:', event.error);
+                // Don't show error to user, just fail silently
+            };
+
+            utterance.onend = () => {
+                console.log('Finished speaking:', colorName);
+            };
+
+            // Speak the color name
+            this.synth.speak(utterance);
+
+        } catch (error) {
+            console.warn('Speech synthesis not available:', error);
+            // Fail silently - don't interrupt the user experience
+        }
+    }
+
+    selectBestVoice(utterance) {
+        try {
+            const voices = this.synth.getVoices();
+            
+            if (voices.length === 0) {
+                // If no voices are loaded yet, wait a bit and try again
+                setTimeout(() => {
+                    const voices = this.synth.getVoices();
+                    this.selectBestVoiceFromList(utterance, voices);
+                }, 100);
+                return;
+            }
+
+            this.selectBestVoiceFromList(utterance, voices);
+        } catch (error) {
+            console.warn('Error getting voices:', error);
+        }
+    }
+
+    selectBestVoiceFromList(utterance, voices) {
+        // Priority order for voice selection (cross-platform)
+        const preferredVoices = [
+            'Microsoft Zira Desktop',      // Windows 10/11
+            'Microsoft David Desktop',     // Windows 10/11
+            'Alex',                        // macOS
+            'Samantha',                    // macOS
+            'Victoria',                    // macOS
+            'Daniel',                      // macOS
+            'Google US English',           // Chrome
+            'English (United States)',     // Generic
+            'en-US'                        // Language fallback
+        ];
+
+        // Try to find a preferred voice
+        for (const preferred of preferredVoices) {
+            const voice = voices.find(v => 
+                v.name.includes(preferred) || 
+                v.lang.includes(preferred) ||
+                (preferred === 'en-US' && v.lang.startsWith('en'))
+            );
+            
+            if (voice) {
+                utterance.voice = voice;
+                console.log('Selected voice:', voice.name);
+                return;
+            }
+        }
+
+        // Fallback to first available English voice
+        const englishVoice = voices.find(v => v.lang.startsWith('en'));
+        if (englishVoice) {
+            utterance.voice = englishVoice;
+            console.log('Using fallback voice:', englishVoice.name);
+        } else if (voices.length > 0) {
+            // Last resort - use any available voice
+            utterance.voice = voices[0];
+            console.log('Using default voice:', voices[0].name);
+        }
+    }
+
+    toggleSpeech(enabled) {
+        this.speechEnabled = enabled;
+        console.log('Speech enabled:', enabled);
+        
+        // If disabling speech, cancel any ongoing speech
+        if (!enabled) {
+            this.synth.cancel();
+        }
     }
 }
 
