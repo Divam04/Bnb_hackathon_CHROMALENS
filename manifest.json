@@ -2,14 +2,11 @@
   "manifest_version": 3,
   "name": "ChromaLens - Colorblind Accessibility Tool",
   "version": "2.0.0",
-  "description": "A comprehensive tool for colorblind users featuring an accurate color inspector and screen filters.",
+  "description": "A color accessibility tool featuring an accurate color inspector for identifying colors on any webpage.",
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting"
-  ],
-  "host_permissions": [
-    "<all_urls>"
+    "scripting",
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -23,19 +20,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "css": [
-        "content.css"
-      ]
-    }
-  ],
   "icons": {
     "16": "images/icon16.png",
     "48": "images/icon48.png",

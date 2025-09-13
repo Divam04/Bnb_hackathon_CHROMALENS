@@ -1,8 +1,8 @@
 class ChromaLensPopup {
     constructor() {
-        this.magnifierActive = false;
-        this.currentFilter = 'protanopia';
         this.cache = new Map();
+        this.speechEnabled = true;
+        this.synth = window.speechSynthesis;
         this.init();
     }
 
@@ -15,25 +15,21 @@ class ChromaLensPopup {
             inspectorColorName: document.getElementById('inspector-color-name'),
             inspectorColorHex: document.getElementById('inspector-color-hex'),
 
-            // Magnifier
-            toggleMagnifierBtn: document.getElementById('toggle-magnifier'),
-            filterRadios: document.querySelectorAll('input[name="filter"]'),
+            // Speech
+            speechEnabledCheckbox: document.getElementById('speech-enabled'),
 
             // General
             errorMessage: document.getElementById('error-message'),
         };
 
-        await this.loadState();
+        await this.loadSettings();
+        this.initializeSpeech();
         this.addEventListeners();
-        this.updateUI();
     }
 
     addEventListeners() {
         this.ui.activateInspectorBtn.addEventListener('click', () => this.runInspector());
-        this.ui.toggleMagnifierBtn.addEventListener('click', () => this.toggleMagnifier());
-        this.ui.filterRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => this.handleFilterChange(e.target.value));
-        });
+        this.ui.speechEnabledCheckbox.addEventListener('change', (e) => this.toggleSpeech(e.target.checked));
     }
 
     // --- COLOR INSPECTOR LOGIC ---
@@ -65,7 +61,8 @@ class ChromaLensPopup {
     }
 
     async fetchColorDetails(hex) {
-        this.displayColorInfo({ name: 'Identifying...', hex });
+        // Show "Identifying..." without speaking it
+        this.displayColorInfoSilent({ name: 'Identifying...', hex });
         
         if (this.cache.has(hex)) {
             this.displayColorInfo(this.cache.get(hex));
@@ -98,68 +95,134 @@ class ChromaLensPopup {
         this.ui.inspectorColorName.textContent = name;
         this.ui.inspectorColorHex.textContent = hex.toUpperCase();
         this.hideError();
+        
+        // Speak the color name if speech is enabled
+        if (this.speechEnabled) {
+            this.speakColorName(name);
+        }
     }
 
-
-    // --- MAGNIFIER LOGIC ---
-    
-    toggleMagnifier() {
-        this.magnifierActive = !this.magnifierActive;
-        this.updateAndNotify();
-    }
-    
-    handleFilterChange(newFilter) {
-        this.currentFilter = newFilter;
-        this.updateAndNotify();
-    }
-    
-    // --- STATE & UI MANAGEMENT ---
-
-    async updateAndNotify() {
-        await this.saveState();
-        this.updateUI();
-        this.sendMessageToContentScript({
-            action: this.magnifierActive ? 'activateMagnifier' : 'deactivateMagnifier',
-            filter: this.currentFilter,
-        });
-    }
-    
-    async saveState() {
-        await chrome.storage.local.set({
-            magnifierActive: this.magnifierActive,
-            currentFilter: this.currentFilter,
-        });
+    displayColorInfoSilent({ name, hex }) {
+        this.ui.inspectorResult.classList.remove('hidden');
+        this.ui.inspectorColorPreview.style.backgroundColor = hex;
+        this.ui.inspectorColorName.textContent = name;
+        this.ui.inspectorColorHex.textContent = hex.toUpperCase();
+        this.hideError();
+        
+        // Don't speak for "Identifying..." or other temporary text
     }
 
-    async loadState() {
-        const data = await chrome.storage.local.get(['magnifierActive', 'currentFilter']);
-        this.magnifierActive = data.magnifierActive || false;
-        this.currentFilter = data.currentFilter || 'protanopia';
-    }
+    // --- SPEECH FUNCTIONALITY ---
 
-    updateUI() {
-        // Magnifier button
-        if (this.magnifierActive) {
-            this.ui.toggleMagnifierBtn.textContent = 'Deactivate';
-            this.ui.toggleMagnifierBtn.classList.add('active');
+    initializeSpeech() {
+        // Ensure voices are loaded
+        if (this.synth.getVoices().length === 0) {
+            // Voices might not be loaded yet, wait for them
+            this.synth.addEventListener('voiceschanged', () => {
+                console.log('Voices loaded:', this.synth.getVoices().length);
+                this.logAvailableVoices();
+            });
         } else {
-            this.ui.toggleMagnifierBtn.textContent = 'Activate';
-            this.ui.toggleMagnifierBtn.classList.remove('active');
+            this.logAvailableVoices();
+        }
+    }
+
+    logAvailableVoices() {
+        const voices = this.synth.getVoices();
+        console.log('Available voices:');
+        voices.forEach(voice => {
+            if (voice.lang.startsWith('en')) {
+                console.log(`- ${voice.name} (${voice.lang})`);
+            }
+        });
+    }
+
+    speakColorName(colorName) {
+        if (!this.synth) {
+            console.warn('Speech synthesis not supported');
+            return;
         }
 
-        // Filter radio
-        document.querySelector(`input[name="filter"][value="${this.currentFilter}"]`).checked = true;
+        // Cancel any ongoing speech
+        this.synth.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(colorName);
+        
+        // Configure speech settings for smoother, clearer speech
+        utterance.rate = 0.75; // Slower for better clarity
+        utterance.pitch = 1.1; // Slightly higher pitch for clarity
+        utterance.volume = 0.9; // Higher volume for better audibility
+        
+        // Get available voices
+        const voices = this.synth.getVoices();
+        
+        // Priority order for voice selection (Indian English first)
+        const voicePriorities = [
+            // Indian English voices (highest priority)
+            voice => voice.lang === 'en-IN' && (voice.name.includes('Google') || voice.name.includes('Microsoft')),
+            voice => voice.lang === 'en-IN',
+            voice => voice.lang.startsWith('en-IN'),
+            
+            // Other English voices with Indian characteristics
+            voice => voice.lang === 'en' && (voice.name.includes('India') || voice.name.includes('Indian')),
+            voice => voice.lang === 'en' && (voice.name.includes('Ravi') || voice.name.includes('Priya') || voice.name.includes('Kiran')),
+            
+            // High-quality English voices as fallback
+            voice => voice.lang.startsWith('en') && (voice.name.includes('Google') || voice.name.includes('Microsoft')),
+            voice => voice.lang.startsWith('en') && voice.name.includes('Natural'),
+            voice => voice.lang.startsWith('en') && voice.name.includes('Enhanced'),
+            
+            // Any English voice as last resort
+            voice => voice.lang.startsWith('en')
+        ];
+        
+        // Find the best available voice
+        let selectedVoice = null;
+        for (const priority of voicePriorities) {
+            selectedVoice = voices.find(priority);
+            if (selectedVoice) break;
+        }
+        
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            console.log('Selected voice:', selectedVoice.name, selectedVoice.lang);
+        } else {
+            console.log('Using default voice');
+        }
+
+        // Speak the color name
+        this.synth.speak(utterance);
     }
 
-    async sendMessageToContentScript(message) {
+    toggleSpeech(enabled) {
+        this.speechEnabled = enabled;
+        this.saveSettings();
+        
+        // If disabling, cancel any ongoing speech
+        if (!enabled && this.synth) {
+            this.synth.cancel();
+        }
+    }
+
+    // --- SETTINGS MANAGEMENT ---
+
+    async loadSettings() {
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab) {
-                await chrome.tabs.sendMessage(tab.id, message);
-            }
+            const data = await chrome.storage.local.get(['speechEnabled']);
+            this.speechEnabled = data.speechEnabled !== undefined ? data.speechEnabled : true;
+            this.ui.speechEnabledCheckbox.checked = this.speechEnabled;
         } catch (error) {
-            console.error('Error sending message to content script:', error);
-            this.showError("Communication error. Please reload the page.");
+            console.error('Error loading settings:', error);
+        }
+    }
+
+    async saveSettings() {
+        try {
+            await chrome.storage.local.set({
+                speechEnabled: this.speechEnabled
+            });
+        } catch (error) {
+            console.error('Error saving settings:', error);
         }
     }
 
