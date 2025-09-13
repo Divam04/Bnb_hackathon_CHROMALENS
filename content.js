@@ -102,25 +102,24 @@ class Magnifier {
     }
 
     async captureAndDraw() {
-        if (!this.imageCapture) return; // Exit if permission wasn't granted or stream ended
+        if (!this.imageCapture) return;
 
         try {
+            // 1. Get the magnifier's position and size WHILE IT IS VISIBLE.
             const rect = this.magnifierEl.getBoundingClientRect();
-            // Capture a slightly larger area for better centering
             const captureX = rect.left + (rect.width / 2) - (this.canvasEl.width / 4);
             const captureY = rect.top + (rect.height / 2) - (this.canvasEl.height / 4);
 
-            // Hide magnifier before capture to avoid capturing itself
+            // 2. NOW, hide the magnifier to avoid capturing it.
             this.magnifierEl.style.display = 'none';
 
-            // RE-USE the existing imageCapture object to grab a frame from the active stream
+            // 3. Capture the screen using the CORRECT coordinates.
             const bitmap = await this.imageCapture.grabFrame();
             
-            // Restore magnifier visibility
+            // 4. Restore magnifier visibility.
             this.magnifierEl.style.display = 'block';
 
             this.ctx.clearRect(0, 0, this.canvasEl.width, this.canvasEl.height);
-            // Draw a magnified version of the captured area
             this.ctx.drawImage(
                 bitmap,
                 captureX * window.devicePixelRatio, captureY * window.devicePixelRatio,
@@ -133,7 +132,6 @@ class Magnifier {
 
         } catch (err) {
             console.error("ChromaLens Capture Error:", err);
-            // If capturing fails (e.g., user clicks "Stop sharing"), destroy the magnifier
             this.destroy();
         }
     }
