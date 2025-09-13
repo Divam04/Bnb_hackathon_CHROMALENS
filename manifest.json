@@ -5,8 +5,7 @@
   "description": "A color accessibility tool featuring an accurate color inspector for identifying colors on any webpage.",
   "permissions": [
     "activeTab",
-    "scripting",
-    "storage"
+    "scripting"
   ],
   "action": {
     "default_popup": "popup.html",
