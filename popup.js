@@ -3,6 +3,9 @@ class ChromaLensPopup {
         this.cache = new Map();
         this.speechEnabled = true;
         this.synth = window.speechSynthesis;
+        this.cameraActive = false;
+        this.videoStream = null;
+        this.colorDetectionInterval = null;
         this.init();
     }
 
@@ -18,6 +21,18 @@ class ChromaLensPopup {
             // Speech
             speechEnabledCheckbox: document.getElementById('speech-enabled'),
 
+            // Camera
+            toggleCameraBtn: document.getElementById('toggle-camera'),
+            cameraContainer: document.getElementById('camera-container'),
+            cameraVideo: document.getElementById('camera-video'),
+            colorDetector: document.getElementById('color-detector'),
+            captureColorBtn: document.getElementById('capture-color'),
+            stopCameraBtn: document.getElementById('stop-camera'),
+            cameraResult: document.getElementById('camera-result'),
+            cameraColorPreview: document.getElementById('camera-color-preview'),
+            cameraColorName: document.getElementById('camera-color-name'),
+            cameraColorHex: document.getElementById('camera-color-hex'),
+
             // General
             errorMessage: document.getElementById('error-message'),
         };
@@ -28,6 +43,11 @@ class ChromaLensPopup {
     addEventListeners() {
         this.ui.activateInspectorBtn.addEventListener('click', () => this.runInspector());
         this.ui.speechEnabledCheckbox.addEventListener('change', (e) => this.toggleSpeech(e.target.checked));
+        
+        // Camera event listeners
+        this.ui.toggleCameraBtn.addEventListener('click', () => this.toggleCamera());
+        this.ui.captureColorBtn.addEventListener('click', () => this.captureColorFromCamera());
+        this.ui.stopCameraBtn.addEventListener('click', () => this.stopCamera());
     }
 
     // --- COLOR INSPECTOR LOGIC ---
@@ -270,6 +290,196 @@ class ChromaLensPopup {
         // If disabling speech, cancel any ongoing speech
         if (!enabled) {
             this.synth.cancel();
+        }
+    }
+
+    // --- CAMERA COLOR DETECTION LOGIC ---
+
+    async toggleCamera() {
+        if (this.cameraActive) {
+            this.stopCamera();
+        } else {
+            await this.startCamera();
+        }
+    }
+
+    async startCamera() {
+        try {
+            // Request camera access
+            this.videoStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: 'environment' // Use back camera if available
+                }
+            });
+
+            // Set video source
+            this.ui.cameraVideo.srcObject = this.videoStream;
+            
+            // Wait for video to load
+            this.ui.cameraVideo.onloadedmetadata = () => {
+                this.ui.cameraVideo.play();
+                this.cameraActive = true;
+                this.updateCameraUI();
+                this.startColorDetection();
+            };
+
+        } catch (error) {
+            console.error('Camera error:', error);
+            this.showError('Could not access camera. Please check permissions.');
+        }
+    }
+
+    stopCamera() {
+        // Stop video stream
+        if (this.videoStream) {
+            this.videoStream.getTracks().forEach(track => track.stop());
+            this.videoStream = null;
+        }
+
+        // Clear video source
+        this.ui.cameraVideo.srcObject = null;
+        
+        // Stop color detection
+        if (this.colorDetectionInterval) {
+            clearInterval(this.colorDetectionInterval);
+            this.colorDetectionInterval = null;
+        }
+
+        this.cameraActive = false;
+        this.updateCameraUI();
+    }
+
+    updateCameraUI() {
+        if (this.cameraActive) {
+            this.ui.toggleCameraBtn.textContent = 'Stop Camera';
+            this.ui.toggleCameraBtn.classList.add('active');
+            this.ui.cameraContainer.classList.remove('hidden');
+        } else {
+            this.ui.toggleCameraBtn.textContent = 'Start Camera';
+            this.ui.toggleCameraBtn.classList.remove('active');
+            this.ui.cameraContainer.classList.add('hidden');
+            this.ui.cameraResult.classList.add('hidden');
+        }
+    }
+
+    startColorDetection() {
+        // Detect color every 500ms for smooth performance
+        this.colorDetectionInterval = setInterval(() => {
+            this.detectColorFromVideo();
+        }, 500);
+    }
+
+    detectColorFromVideo() {
+        if (!this.cameraActive || this.ui.cameraVideo.videoWidth === 0) return;
+
+        try {
+            // Create canvas to capture video frame
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to video size
+            canvas.width = this.ui.cameraVideo.videoWidth;
+            canvas.height = this.ui.cameraVideo.videoHeight;
+            
+            // Draw current video frame
+            ctx.drawImage(this.ui.cameraVideo, 0, 0);
+            
+            // Get pixel color from center of video (where the detector circle is)
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const pixelData = ctx.getImageData(centerX, centerY, 1, 1).data;
+            
+            // Convert to hex
+            const r = pixelData[0];
+            const g = pixelData[1];
+            const b = pixelData[2];
+            const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            
+            // Update detector circle color
+            this.ui.colorDetector.style.borderColor = hex;
+            this.ui.colorDetector.style.boxShadow = `0 0 20px ${hex}80`;
+            
+        } catch (error) {
+            console.warn('Color detection error:', error);
+        }
+    }
+
+    async captureColorFromCamera() {
+        if (!this.cameraActive) return;
+
+        try {
+            // Create canvas to capture video frame
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to video size
+            canvas.width = this.ui.cameraVideo.videoWidth;
+            canvas.height = this.ui.cameraVideo.videoHeight;
+            
+            // Draw current video frame
+            ctx.drawImage(this.ui.cameraVideo, 0, 0);
+            
+            // Get pixel color from center of video
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const pixelData = ctx.getImageData(centerX, centerY, 1, 1).data;
+            
+            // Convert to hex
+            const r = pixelData[0];
+            const g = pixelData[1];
+            const b = pixelData[2];
+            const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            
+            // Fetch color details and display
+            await this.fetchColorDetailsForCamera(hex);
+            
+        } catch (error) {
+            console.error('Capture error:', error);
+            this.showError('Could not capture color from camera.');
+        }
+    }
+
+    async fetchColorDetailsForCamera(hex) {
+        // Show "Identifying..." without speaking it
+        this.displayCameraColorInfo({ name: 'Identifying...', hex });
+        
+        if (this.cache.has(hex)) {
+            this.displayCameraColorInfo(this.cache.get(hex));
+            return;
+        }
+
+        try {
+            const cleanHex = hex.substring(1);
+            const response = await fetch(`https://www.thecolorapi.com/id?hex=${cleanHex}`);
+            if (!response.ok) throw new Error(`API error: ${response.status}`);
+            
+            const data = await response.json();
+            const colorInfo = {
+                name: data.name.value,
+                hex: data.hex.value,
+            };
+
+            this.cache.set(hex, colorInfo);
+            this.displayCameraColorInfo(colorInfo);
+        } catch (error) {
+            console.error("Color API Error:", error);
+            this.showError("Could not get color name.");
+            this.displayCameraColorInfo({ name: "Unknown Color", hex });
+        }
+    }
+
+    displayCameraColorInfo({ name, hex }) {
+        this.ui.cameraResult.classList.remove('hidden');
+        this.ui.cameraColorPreview.style.backgroundColor = hex;
+        this.ui.cameraColorName.textContent = name;
+        this.ui.cameraColorHex.textContent = hex.toUpperCase();
+        this.hideError();
+        
+        // Speak the color name if speech is enabled and it's not "Identifying..."
+        if (this.speechEnabled && name !== 'Identifying...' && name !== 'Unknown Color') {
+            this.speakColorName(name);
         }
     }
 }

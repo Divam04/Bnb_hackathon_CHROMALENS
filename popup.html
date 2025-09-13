@@ -32,6 +32,31 @@
                     </label>
                 </div>
             </div>
+
+            <div class="tool-card" id="camera-tool">
+                <h3><span class="icon">📷</span> Real-World Vision</h3>
+                <p>Point your camera at any object to identify its color in real-time.</p>
+                <button class="tool-btn" id="toggle-camera">Start Camera</button>
+                
+                <div class="camera-container hidden" id="camera-container">
+                    <div class="camera-preview">
+                        <video id="camera-video" autoplay muted playsinline></video>
+                        <div class="color-detector" id="color-detector"></div>
+                    </div>
+                    <div class="camera-controls">
+                        <button class="control-btn" id="capture-color">Capture Color</button>
+                        <button class="control-btn secondary" id="stop-camera">Stop Camera</button>
+                    </div>
+                </div>
+
+                <div class="result-container hidden" id="camera-result">
+                    <div class="color-preview" id="camera-color-preview"></div>
+                    <div class="color-details">
+                        <strong id="camera-color-name"></strong>
+                        <span id="camera-color-hex"></span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="error-message" class="error hidden"></div>
