@@ -167,27 +167,12 @@ class ColorblindFilter {
     }
 
     applyFilter(x, y, width, height) {
-        // Find all elements that intersect with the selected area
-        const elementsInArea = this.getElementsInArea(x, y, width, height);
-        
-        // Apply colorblind filter to each element
-        const originalStyles = new Map();
-        elementsInArea.forEach(element => {
-            // Store original styles
-            originalStyles.set(element, {
-                filter: element.style.filter,
-                webkitFilter: element.style.webkitFilter
-            });
-            
-            // Apply colorblind filter
-            const filterCSS = this.getColorblindCSSFilter(this.filterType);
-            element.style.filter = filterCSS;
-            element.style.webkitFilter = filterCSS;
-        });
+        // Create a filter overlay that only covers the selected region
+        // This approach avoids affecting elements directly and only shows the filter in the selected area
 
-        // Create a visual indicator for the filtered area
+        // Create a filter overlay that only covers the selected region
         const filterIndicator = document.createElement('div');
-        filterIndicator.className = 'chromalens-filter-indicator';
+        filterIndicator.className = 'chromalens-filter-overlay';
         filterIndicator.style.cssText = `
             position: fixed;
             left: ${x}px;
@@ -196,10 +181,23 @@ class ColorblindFilter {
             height: ${height}px;
             pointer-events: none;
             z-index: 999998;
-            border: 2px solid #667eea;
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
-            background: transparent;
+            border: 2px solid #ff9800;
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.5);
         `;
+
+        // Apply the color filter only to this specific region
+        const filterCSS = this.getColorblindCSSFilter(this.filterType);
+        
+        // Use backdrop-filter to apply the colorblind effect to the content behind
+        filterIndicator.style.backdropFilter = filterCSS;
+        filterIndicator.style.webkitBackdropFilter = filterCSS;
+        
+        // Add a semi-transparent background to make the effect visible
+        filterIndicator.style.background = 'rgba(255, 255, 255, 0.1)';
+        
+        // Create a mask to ensure the filter only affects the selected area
+        filterIndicator.style.clipPath = `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)`;
+        filterIndicator.style.webkitClipPath = `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)`;
 
         // Create a control panel for the filter
         const controlPanel = this.createControlPanel(filterIndicator, x, y, width, height);
@@ -211,9 +209,7 @@ class ColorblindFilter {
         this.overlay.style.display = 'none';
 
         // Store references for cleanup
-        this.currentFilterElements = elementsInArea;
-        this.currentOriginalStyles = originalStyles;
-        this.currentFilterIndicator = filterIndicator;
+        this.currentFilterOverlay = filterIndicator;
         this.currentControlPanel = controlPanel;
 
         // Show the filter for 10 seconds, then remove it
@@ -322,30 +318,18 @@ class ColorblindFilter {
     }
 
     removeCurrentFilter() {
-        // Restore original styles to filtered elements
-        if (this.currentFilterElements && this.currentOriginalStyles) {
-            this.currentFilterElements.forEach(element => {
-                const originalStyle = this.currentOriginalStyles.get(element);
-                if (originalStyle) {
-                    element.style.filter = originalStyle.filter;
-                    element.style.webkitFilter = originalStyle.webkitFilter;
-                }
-            });
+        // Remove filter overlay
+        if (this.currentFilterOverlay && document.body.contains(this.currentFilterOverlay)) {
+            document.body.removeChild(this.currentFilterOverlay);
         }
         
-        // Remove visual indicators
-        if (this.currentFilterIndicator && document.body.contains(this.currentFilterIndicator)) {
-            document.body.removeChild(this.currentFilterIndicator);
-        }
-        
+        // Remove control panel
         if (this.currentControlPanel && document.body.contains(this.currentControlPanel)) {
             document.body.removeChild(this.currentControlPanel);
         }
         
         // Clean up references
-        this.currentFilterElements = null;
-        this.currentOriginalStyles = null;
-        this.currentFilterIndicator = null;
+        this.currentFilterOverlay = null;
         this.currentControlPanel = null;
     }
 
