@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromaLens</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><img src="images/icon48.png" class="logo" alt="logo"> ChromaLens</h1>
+            <p>Color Accessibility Tools</p>
+        </header>
+
+        <div class="tools">
+            <div class="tool-card" id="inspector-tool">
+                <h3><span class="icon">🎯</span> Color Inspector</h3>
+                <p>Instantly identify any color on the screen.</p>
+                <button class="tool-btn" id="activate-inspector">Inspect Color</button>
+                <div class="result-container hidden" id="inspector-result">
+                    <div class="color-preview" id="inspector-color-preview"></div>
+                    <div class="color-details">
+                        <strong id="inspector-color-name"></strong>
+                        <span id="inspector-color-hex"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-card" id="magnifier-tool">
+                <h3><span class="icon">🔍</span> Magnifying Glass</h3>
+                <p>Apply colorblind filters to screen areas.</p>
+                <button class="tool-btn" id="toggle-magnifier">Activate</button>
+            </div>
+        </div>
+
+        <div class="settings">
+            <h3>Filter Settings</h3>
+            <div class="filter-options">
+                <label><input type="radio" name="filter" value="protanopia" checked> Protanopia</label>
+                <label><input type="radio" name="filter" value="deuteranopia"> Deuteranopia</label>
+                <label><input type="radio" name="filter" value="tritanopia"> Tritanopia</label>
+            </div>
+        </div>
+
+        <div id="error-message" class="error hidden"></div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
