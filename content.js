@@ -7,34 +7,66 @@ class Magnifier {
         this.dragOffset = { x: 0, y: 0 };
         this.animationFrameId = null;
         this.currentFilter = 'protanopia';
+        this.stream = null;
+        this.imageCapture = null;
     }
 
-    create() {
+    async create() {
         if (this.magnifierEl) return;
 
-        this.magnifierEl = document.createElement('div');
-        this.magnifierEl.id = 'chromalens-magnifier';
-        
-        this.canvasEl = document.createElement('canvas');
-        this.canvasEl.width = 200;
-        this.canvasEl.height = 200;
-        this.ctx = this.canvasEl.getContext('2d', { willReadFrequently: true });
+        try {
+            // Ask for screen sharing permission only ONCE when creating the magnifier
+            this.stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: 'never', displaySurface: 'monitor' }
+            });
+            const track = this.stream.getVideoTracks()[0];
+            this.imageCapture = new ImageCapture(track);
 
-        this.magnifierEl.appendChild(this.canvasEl);
-        document.body.appendChild(this.magnifierEl);
+            // Now, create the UI elements after getting permission
+            this.magnifierEl = document.createElement('div');
+            this.magnifierEl.id = 'chromalens-magnifier';
+            
+            this.canvasEl = document.createElement('canvas');
+            this.canvasEl.width = 200;
+            this.canvasEl.height = 200;
+            this.ctx = this.canvasEl.getContext('2d', { willReadFrequently: true });
 
-        this.addEventListeners();
-        this.loop();
+            this.magnifierEl.appendChild(this.canvasEl);
+            document.body.appendChild(this.magnifierEl);
+
+            this.addEventListeners();
+            this.loop(); // Start the animation loop
+
+        } catch (err) {
+            console.error("ChromaLens Permission Error:", err);
+            // If the user denies permission, ensure we clean up everything
+            this.destroy(); 
+        }
     }
 
     destroy() {
-        if (!this.magnifierEl) return;
+        // Stop the screen sharing stream
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
         
-        cancelAnimationFrame(this.animationFrameId);
-        this.magnifierEl.remove();
+        // Stop the animation loop
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
+
+        // Remove the magnifier element from the page
+        if (this.magnifierEl) {
+            this.magnifierEl.remove();
+        }
+
+        // Reset all class properties to their initial state
         this.magnifierEl = null;
         this.canvasEl = null;
         this.ctx = null;
+        this.imageCapture = null;
+        this.animationFrameId = null;
     }
 
     addEventListeners() {
@@ -70,6 +102,8 @@ class Magnifier {
     }
 
     async captureAndDraw() {
+        if (!this.imageCapture) return; // Exit if permission wasn't granted or stream ended
+
         try {
             const rect = this.magnifierEl.getBoundingClientRect();
             // Capture a slightly larger area for better centering
@@ -79,18 +113,8 @@ class Magnifier {
             // Hide magnifier before capture to avoid capturing itself
             this.magnifierEl.style.display = 'none';
 
-            // Use browser.display.capture API
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    cursor: 'never',
-                    displaySurface: 'monitor',
-                }
-            });
-            const track = stream.getVideoTracks()[0];
-            const imageCapture = new ImageCapture(track);
-            const bitmap = await imageCapture.grabFrame();
-            
-            track.stop(); // Stop the track immediately after capture
+            // RE-USE the existing imageCapture object to grab a frame from the active stream
+            const bitmap = await this.imageCapture.grabFrame();
             
             // Restore magnifier visibility
             this.magnifierEl.style.display = 'block';
@@ -109,7 +133,8 @@ class Magnifier {
 
         } catch (err) {
             console.error("ChromaLens Capture Error:", err);
-            if (this.magnifierEl) this.magnifierEl.style.display = 'block'; // Ensure it's visible on error
+            // If capturing fails (e.g., user clicks "Stop sharing"), destroy the magnifier
+            this.destroy();
         }
     }
 
@@ -157,13 +182,13 @@ class Magnifier {
 // --- Global Listener ---
 const magnifierInstance = new Magnifier();
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     if (message.action === 'activateMagnifier') {
-        magnifierInstance.create();
+        await magnifierInstance.create(); // Await the async create function
         magnifierInstance.setFilter(message.filter);
     } else if (message.action === 'deactivateMagnifier') {
         magnifierInstance.destroy();
     }
     sendResponse({ status: "done" });
-    return true;
+    return true; // Keep the message channel open for async response
 });
