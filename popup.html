@@ -4,20 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChromaLens</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <div class="container">
-        <header>
+        <header class="text-center">
             <h1><img src="images/icon48.png" class="logo" alt="logo"> ChromaLens</h1>
             <p>Color Accessibility Tools</p>
         </header>
 
-        <div class="tools">
-            <div class="tool-card" id="inspector-tool">
-                <h3><span class="icon">🎯</span> Color Inspector</h3>
-                <p>Instantly identify any color on the screen.</p>
-                <button class="tool-btn" id="activate-inspector">Inspect Color</button>
+        <main>
+            <article id="inspector-tool">
+                <header>
+                    <h3><span class="icon">🎯</span> Color Inspector</h3>
+                    <p>Instantly identify any color on the screen.</p>
+                </header>
+                <button class="primary" id="activate-inspector">Inspect Color</button>
                 <div class="result-container hidden" id="inspector-result">
                     <div class="color-preview" id="inspector-color-preview"></div>
                     <div class="color-details">
@@ -26,26 +29,28 @@
                     </div>
                 </div>
                 <div class="speech-controls">
-                    <label class="speech-toggle">
+                    <label>
                         <input type="checkbox" id="speech-enabled" checked>
-                        <span class="speech-label">🔊 Speak color names</span>
+                        🔊 Speak color names
                     </label>
                 </div>
-            </div>
+            </article>
 
-            <div class="tool-card" id="camera-tool">
-                <h3><span class="icon">📷</span> Real-World Vision</h3>
-                <p>Point your camera at any object to identify its color in real-time.</p>
-                <button class="tool-btn" id="toggle-camera">Start Camera</button>
+            <article id="camera-tool">
+                <header>
+                    <h3><span class="icon">📷</span> Real-World Vision</h3>
+                    <p>Point your camera at any object to identify its color in real-time.</p>
+                </header>
+                <button class="primary" id="toggle-camera">Start Camera</button>
                 
                 <div class="camera-container hidden" id="camera-container">
                     <div class="camera-preview">
                         <video id="camera-video" autoplay muted playsinline></video>
                         <div class="color-detector" id="color-detector"></div>
                     </div>
-                    <div class="camera-controls">
-                        <button class="control-btn" id="capture-color">Capture Color</button>
-                        <button class="control-btn secondary" id="stop-camera">Stop Camera</button>
+                    <div class="grid">
+                        <button class="secondary" id="capture-color">Capture Color</button>
+                        <button class="secondary" id="stop-camera">Stop Camera</button>
                     </div>
                 </div>
 
@@ -56,35 +61,38 @@
                         <span id="camera-color-hex"></span>
                     </div>
                 </div>
-            </div>
+            </article>
 
-            <div class="tool-card" id="filter-tool">
-                <h3><span class="icon">🔍</span> Colorblind Filter</h3>
-                <p>Apply colorblind filters to specific areas of the screen to simulate different types of color vision.</p>
+            <article id="filter-tool">
+                <header>
+                    <h3><span class="icon">🔍</span> Colorblind Filter</h3>
+                    <p>Apply colorblind filters to specific areas of the screen to simulate different types of color vision.</p>
+                </header>
                 
-                <div class="filter-options">
+                <fieldset>
+                    <legend>Filter Type</legend>
                     <label>
                         <input type="radio" name="filter-type" value="protanopia" checked>
-                        <span>Protanopia (Red-blind)</span>
+                        Protanopia (Red-blind)
                     </label>
                     <label>
                         <input type="radio" name="filter-type" value="deuteranopia">
-                        <span>Deuteranopia (Green-blind)</span>
+                        Deuteranopia (Green-blind)
                     </label>
                     <label>
                         <input type="radio" name="filter-type" value="tritanopia">
-                        <span>Tritanopia (Blue-blind)</span>
+                        Tritanopia (Blue-blind)
                     </label>
-                </div>
+                </fieldset>
                 
-                <button class="tool-btn" id="activate-filter">Start Filter</button>
+                <button class="primary" id="activate-filter">Start Filter</button>
                 
                 <div class="filter-instructions hidden" id="filter-instructions">
                     <p><strong>Instructions:</strong> Click and drag to select an area to apply the filter to.</p>
-                    <button class="control-btn secondary" id="stop-filter">Stop Filter</button>
+                    <button class="secondary" id="stop-filter">Stop Filter</button>
                 </div>
-            </div>
-        </div>
+            </article>
+        </main>
 
         <div id="error-message" class="error hidden"></div>
     </div>
