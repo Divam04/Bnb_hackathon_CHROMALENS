@@ -6,6 +6,7 @@ class ChromaLensPopup {
         this.cameraActive = false;
         this.videoStream = null;
         this.colorDetectionInterval = null;
+        this.filterActive = false;
         this.init();
     }
 
@@ -33,6 +34,11 @@ class ChromaLensPopup {
             cameraColorName: document.getElementById('camera-color-name'),
             cameraColorHex: document.getElementById('camera-color-hex'),
 
+            // Filter
+            activateFilterBtn: document.getElementById('activate-filter'),
+            filterInstructions: document.getElementById('filter-instructions'),
+            stopFilterBtn: document.getElementById('stop-filter'),
+
             // General
             errorMessage: document.getElementById('error-message'),
         };
@@ -48,6 +54,10 @@ class ChromaLensPopup {
         this.ui.toggleCameraBtn.addEventListener('click', () => this.toggleCamera());
         this.ui.captureColorBtn.addEventListener('click', () => this.captureColorFromCamera());
         this.ui.stopCameraBtn.addEventListener('click', () => this.stopCamera());
+        
+        // Filter event listeners
+        this.ui.activateFilterBtn.addEventListener('click', () => this.toggleFilter());
+        this.ui.stopFilterBtn.addEventListener('click', () => this.stopFilter());
     }
 
     // --- COLOR INSPECTOR LOGIC ---
@@ -480,6 +490,97 @@ class ChromaLensPopup {
         // Speak the color name if speech is enabled and it's not "Identifying..."
         if (this.speechEnabled && name !== 'Identifying...' && name !== 'Unknown Color') {
             this.speakColorName(name);
+        }
+    }
+
+    // --- COLORBLIND FILTER LOGIC ---
+
+    async toggleFilter() {
+        if (this.filterActive) {
+            await this.stopFilter();
+        } else {
+            await this.startFilter();
+        }
+    }
+
+    async startFilter() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            
+            if (!tab) {
+                this.showError("No active tab found.");
+                return;
+            }
+
+            // Get selected filter type
+            const selectedFilter = document.querySelector('input[name="filter-type"]:checked');
+            const filterType = selectedFilter ? selectedFilter.value : 'protanopia';
+
+            // Inject the content script first
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    files: ['content-script.js']
+                });
+            } catch (injectError) {
+                // If injection fails, try to send message anyway (script might already be injected)
+                console.log("Script injection failed, trying to send message anyway:", injectError);
+            }
+
+            // Wait a moment for the script to initialize
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Send message to content script
+            await chrome.tabs.sendMessage(tab.id, {
+                action: 'startFilter',
+                filterType: filterType
+            });
+
+            this.filterActive = true;
+            this.updateFilterUI();
+            this.hideError();
+
+        } catch (error) {
+            console.error("Filter Error:", error);
+            this.showError("Could not start filter. Try reloading the page.");
+        }
+    }
+
+    async stopFilter() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            
+            if (tab) {
+                try {
+                    await chrome.tabs.sendMessage(tab.id, {
+                        action: 'stopFilter'
+                    });
+                } catch (messageError) {
+                    console.log("Could not send stop message, content script may not be loaded:", messageError);
+                }
+            }
+
+            this.filterActive = false;
+            this.updateFilterUI();
+            this.hideError();
+
+        } catch (error) {
+            console.error("Stop Filter Error:", error);
+            // Still update UI even if there's an error
+            this.filterActive = false;
+            this.updateFilterUI();
+        }
+    }
+
+    updateFilterUI() {
+        if (this.filterActive) {
+            this.ui.activateFilterBtn.textContent = 'Stop Filter';
+            this.ui.activateFilterBtn.classList.add('active');
+            this.ui.filterInstructions.classList.remove('hidden');
+        } else {
+            this.ui.activateFilterBtn.textContent = 'Start Filter';
+            this.ui.activateFilterBtn.classList.remove('active');
+            this.ui.filterInstructions.classList.add('hidden');
         }
     }
 }

@@ -57,6 +57,33 @@
                     </div>
                 </div>
             </div>
+
+            <div class="tool-card" id="filter-tool">
+                <h3><span class="icon">🔍</span> Colorblind Filter</h3>
+                <p>Apply colorblind filters to specific areas of the screen to simulate different types of color vision.</p>
+                
+                <div class="filter-options">
+                    <label>
+                        <input type="radio" name="filter-type" value="protanopia" checked>
+                        <span>Protanopia (Red-blind)</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="filter-type" value="deuteranopia">
+                        <span>Deuteranopia (Green-blind)</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="filter-type" value="tritanopia">
+                        <span>Tritanopia (Blue-blind)</span>
+                    </label>
+                </div>
+                
+                <button class="tool-btn" id="activate-filter">Start Filter</button>
+                
+                <div class="filter-instructions hidden" id="filter-instructions">
+                    <p><strong>Instructions:</strong> Click and drag to select an area to apply the filter to.</p>
+                    <button class="control-btn secondary" id="stop-filter">Stop Filter</button>
+                </div>
+            </div>
         </div>
 
         <div id="error-message" class="error hidden"></div>
