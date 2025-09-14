@@ -9,12 +9,15 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', 'Segoe UI Historic', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Tahoma', 'Geneva', 'Verdana', 'Arial', sans-serif;
     background-color: var(--bg-light);
     color: var(--text-dark);
     width: 320px;
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 .container { 
@@ -404,4 +407,92 @@ button:focus,
 input:focus {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
+}
+
+/* Windows-specific improvements */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+    /* WebKit browsers (Chrome, Edge) on Windows */
+    body {
+        font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Tahoma', 'Arial', sans-serif;
+    }
+    
+    /* Improve button rendering on Windows */
+    button {
+        -webkit-appearance: none;
+        appearance: none;
+        border-radius: 6px;
+    }
+    
+    /* Improve input rendering on Windows */
+    input[type="checkbox"],
+    input[type="radio"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ccc;
+        border-radius: 3px;
+        background: white;
+        position: relative;
+    }
+    
+    input[type="checkbox"]:checked,
+    input[type="radio"]:checked {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+    
+    input[type="radio"] {
+        border-radius: 50%;
+    }
+    
+    input[type="radio"]:checked::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 6px;
+        height: 6px;
+        background: white;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    input[type="checkbox"]:checked::after {
+        content: '✓';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* Windows High DPI support */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+    .logo {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* Windows scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
