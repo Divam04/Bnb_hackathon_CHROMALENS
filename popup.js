@@ -11,6 +11,12 @@ class ChromaLensPopup {
     }
 
     async init() {
+        // Windows compatibility check
+        const browserInfo = this.getWindowsBrowserInfo();
+        if (browserInfo.isWindows && !browserInfo.isSupported) {
+            console.warn('Windows browser compatibility warning:', browserInfo);
+        }
+
         this.ui = {
             // Inspector
             activateInspectorBtn: document.getElementById('activate-inspector'),
@@ -43,7 +49,39 @@ class ChromaLensPopup {
             errorMessage: document.getElementById('error-message'),
         };
 
+        // Windows-specific initialization
+        if (browserInfo.isWindows) {
+            this.initializeWindowsFeatures();
+        }
+
         this.addEventListeners();
+    }
+
+    initializeWindowsFeatures() {
+        // Windows-specific speech synthesis initialization
+        if (this.synth) {
+            // Load voices for Windows
+            this.synth.onvoiceschanged = () => {
+                console.log('Voices loaded for Windows');
+            };
+        }
+
+        // Windows-specific error handling
+        window.addEventListener('error', (event) => {
+            if (this.detectWindows()) {
+                console.error('Windows error:', event.error);
+                // Don't show generic errors to user on Windows
+            }
+        });
+
+        // Windows-specific unhandled promise rejection handling
+        window.addEventListener('unhandledrejection', (event) => {
+            if (this.detectWindows()) {
+                console.error('Windows unhandled promise rejection:', event.reason);
+                // Prevent default error display
+                event.preventDefault();
+            }
+        });
     }
 
     addEventListeners() {
@@ -71,28 +109,109 @@ class ChromaLensPopup {
                 return;
             }
 
-            // Check if EyeDropper API is supported
-            if (window.EyeDropper) {
-                // Use native EyeDropper API
-                const injectionResults = await chrome.scripting.executeScript({
-                    target: { tabId: tab.id },
-                    function: injectedEyeDropper,
-                });
+            // Enhanced Windows compatibility check
+            const isWindows = this.detectWindows();
+            const isChrome = this.detectChrome();
+            const chromeVersion = this.getChromeVersion();
 
-                const result = injectionResults[0].result;
-                if (result.error) {
-                    this.showError(result.error);
-                } else if (result.hexValue) {
-                    this.fetchColorDetails(result.hexValue);
+            // Check if EyeDropper API is supported with Windows-specific handling
+            if (window.EyeDropper) {
+                try {
+                    // Use native EyeDropper API with Windows-specific error handling
+                    const injectionResults = await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        function: injectedEyeDropper,
+                    });
+
+                    const result = injectionResults[0].result;
+                    if (result.error) {
+                        if (isWindows && result.error.includes('NotAllowedError')) {
+                            this.showError("Color picker was cancelled or blocked. Please try again and allow the permission.");
+                        } else if (isWindows && result.error.includes('AbortError')) {
+                            // User cancelled - don't show error
+                            return;
+                        } else {
+                            this.showError(result.error);
+                        }
+                    } else if (result.hexValue) {
+                        this.fetchColorDetails(result.hexValue);
+                    }
+                } catch (injectionError) {
+                    console.error("Injection error:", injectionError);
+                    if (isWindows) {
+                        this.showError("Failed to access color picker on Windows. Using fallback method.");
+                        this.showFallbackColorPicker();
+                    } else {
+                        this.showError("Could not inspect color. Try reloading the page.");
+                    }
                 }
             } else {
-                // Fallback to HTML color picker
+                // Enhanced fallback for Windows
+                if (isWindows && isChrome && chromeVersion < 95) {
+                    this.showError("EyeDropper API requires Chrome 95+ on Windows. Please update Chrome or use the fallback color picker.");
+                }
                 this.showFallbackColorPicker();
             }
         } catch (error) {
             console.error("ChromaLens Error:", error);
-            this.showError("Could not inspect color. Try reloading the page.");
+            const isWindows = this.detectWindows();
+            if (isWindows && error.name === 'NotAllowedError') {
+                this.showError("Permission denied. Please allow the color picker permission and try again.");
+            } else {
+                this.showError("Could not inspect color. Try reloading the page.");
+            }
         }
+    }
+
+    // Windows compatibility detection methods
+    detectWindows() {
+        const platform = navigator.platform.toLowerCase();
+        const userAgent = navigator.userAgent.toLowerCase();
+        
+        return platform.indexOf('win') > -1 || 
+               userAgent.indexOf('windows') > -1 ||
+               userAgent.indexOf('win32') > -1 ||
+               userAgent.indexOf('win64') > -1;
+    }
+
+    detectChrome() {
+        const userAgent = navigator.userAgent;
+        return userAgent.indexOf('Chrome') > -1 && 
+               userAgent.indexOf('Edg') === -1 &&
+               userAgent.indexOf('OPR') === -1;
+    }
+
+    detectEdge() {
+        const userAgent = navigator.userAgent;
+        return userAgent.indexOf('Edg') > -1 || userAgent.indexOf('Edge') > -1;
+    }
+
+    getChromeVersion() {
+        const match = navigator.userAgent.match(/Chrome\/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+
+    getEdgeVersion() {
+        const match = navigator.userAgent.match(/Edg\/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+    }
+
+    // Enhanced Windows browser detection
+    getWindowsBrowserInfo() {
+        const isWindows = this.detectWindows();
+        const isChrome = this.detectChrome();
+        const isEdge = this.detectEdge();
+        const chromeVersion = this.getChromeVersion();
+        const edgeVersion = this.getEdgeVersion();
+        
+        return {
+            isWindows,
+            isChrome,
+            isEdge,
+            chromeVersion,
+            edgeVersion,
+            isSupported: isWindows && (isChrome || isEdge) && (chromeVersion >= 95 || edgeVersion >= 95)
+        };
     }
 
     async fetchColorDetails(hex) {
@@ -195,28 +314,44 @@ class ChromaLensPopup {
 
     speakColorName(colorName) {
         try {
+            // Check if speech synthesis is available
+            if (!this.synth) {
+                console.warn('Speech synthesis not available');
+                return;
+            }
+
+            // Windows-specific speech synthesis initialization
+            const isWindows = this.detectWindows();
+            
             // Cancel any ongoing speech
             this.synth.cancel();
 
             // Create speech utterance
             const utterance = new SpeechSynthesisUtterance(colorName);
             
-            // Configure speech settings for cross-platform compatibility
-            utterance.volume = 0.8;
-            utterance.rate = 0.9;
-            utterance.pitch = 1.0;
+            // Configure speech settings for Windows compatibility
+            utterance.volume = isWindows ? 0.9 : 0.8;
+            utterance.rate = isWindows ? 0.8 : 0.9;  // Slower for Windows
+            utterance.pitch = isWindows ? 0.9 : 1.0; // Slightly lower pitch for Windows
             utterance.lang = 'en-US';
 
-            // Try to select a good voice
-            this.selectBestVoice(utterance);
+            // Windows-specific voice selection
+            if (isWindows) {
+                this.selectWindowsVoice(utterance);
+            } else {
+                this.selectBestVoice(utterance);
+            }
 
-            // Handle speech events
+            // Handle speech events with Windows-specific error handling
             utterance.onstart = () => {
                 console.log('Speaking:', colorName);
             };
 
             utterance.onerror = (event) => {
                 console.warn('Speech synthesis error:', event.error);
+                if (isWindows && event.error === 'not-allowed') {
+                    console.warn('Speech synthesis blocked on Windows. User may need to enable microphone permissions.');
+                }
                 // Don't show error to user, just fail silently
             };
 
@@ -224,12 +359,83 @@ class ChromaLensPopup {
                 console.log('Finished speaking:', colorName);
             };
 
-            // Speak the color name
-            this.synth.speak(utterance);
+            // Speak the color name with Windows-specific handling
+            try {
+                this.synth.speak(utterance);
+            } catch (speakError) {
+                console.warn('Failed to speak on Windows:', speakError);
+                // Try with default settings as fallback
+                if (isWindows) {
+                    const fallbackUtterance = new SpeechSynthesisUtterance(colorName);
+                    fallbackUtterance.volume = 0.8;
+                    fallbackUtterance.rate = 0.8;
+                    fallbackUtterance.pitch = 1.0;
+                    this.synth.speak(fallbackUtterance);
+                }
+            }
 
         } catch (error) {
             console.warn('Speech synthesis not available:', error);
             // Fail silently - don't interrupt the user experience
+        }
+    }
+
+    selectWindowsVoice(utterance) {
+        try {
+            const voices = this.synth.getVoices();
+            
+            if (voices.length === 0) {
+                // If no voices are loaded yet, wait a bit and try again
+                setTimeout(() => {
+                    const voices = this.synth.getVoices();
+                    this.selectWindowsVoiceFromList(utterance, voices);
+                }, 200); // Longer wait for Windows
+                return;
+            }
+
+            this.selectWindowsVoiceFromList(utterance, voices);
+        } catch (error) {
+            console.warn('Error getting voices on Windows:', error);
+        }
+    }
+
+    selectWindowsVoiceFromList(utterance, voices) {
+        // Windows-specific voice priority
+        const windowsVoices = [
+            'Microsoft Zira Desktop',      // Windows 10/11 female
+            'Microsoft David Desktop',     // Windows 10/11 male
+            'Microsoft Mark Desktop',      // Windows 10/11 male
+            'Microsoft Hazel Desktop',     // Windows 10/11 female
+            'Microsoft Susan Desktop',     // Windows 10/11 female
+            'Microsoft Richard Desktop',   // Windows 10/11 male
+            'Microsoft Catherine Desktop', // Windows 10/11 female
+            'Microsoft James Desktop',     // Windows 10/11 male
+            'Microsoft Linda Desktop',     // Windows 10/11 female
+            'Microsoft Paul Desktop',      // Windows 10/11 male
+            'Google US English',           // Chrome fallback
+            'English (United States)',     // Generic fallback
+            'en-US'                        // Language fallback
+        ];
+
+        // Try to find a Windows voice
+        for (const preferred of windowsVoices) {
+            const voice = voices.find(v => 
+                v.name.includes(preferred) || 
+                v.lang.includes(preferred) ||
+                (preferred === 'en-US' && v.lang.startsWith('en'))
+            );
+            
+            if (voice) {
+                utterance.voice = voice;
+                console.log('Selected Windows voice:', voice.name);
+                return;
+            }
+        }
+
+        // Fallback to any available voice
+        if (voices.length > 0) {
+            utterance.voice = voices[0];
+            console.log('Using fallback voice:', voices[0].name);
         }
     }
 
@@ -315,19 +521,88 @@ class ChromaLensPopup {
 
     async startCamera() {
         try {
-            // Request camera access
-            this.videoStream = await navigator.mediaDevices.getUserMedia({
+            // Windows-specific camera configuration
+            const isWindows = this.detectWindows();
+            
+            // Check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.showError('Camera access not supported in this browser. Please use Chrome or Edge on Windows.');
+                return;
+            }
+
+            // Windows-specific camera constraints
+            const constraints = {
                 video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
+                    width: { ideal: isWindows ? 800 : 640 },
+                    height: { ideal: isWindows ? 600 : 480 },
+                    frameRate: { ideal: isWindows ? 30 : 24 },
                     facingMode: 'environment' // Use back camera if available
                 }
-            });
+            };
+
+            // Add Windows-specific constraints
+            if (isWindows) {
+                constraints.video.deviceId = { exact: undefined }; // Let Windows choose the best camera
+            }
+
+            // Request camera access with Windows-specific error handling
+            this.videoStream = await navigator.mediaDevices.getUserMedia(constraints);
 
             // Set video source
             this.ui.cameraVideo.srcObject = this.videoStream;
             
-            // Wait for video to load
+            // Wait for video to load with Windows-specific handling
+            this.ui.cameraVideo.onloadedmetadata = () => {
+                try {
+                    this.ui.cameraVideo.play();
+                    this.cameraActive = true;
+                    this.updateCameraUI();
+                    this.startColorDetection();
+                } catch (playError) {
+                    console.error('Video play error on Windows:', playError);
+                    this.showError('Failed to start video playback. Please try again.');
+                }
+            };
+
+            // Windows-specific error handling for video loading
+            this.ui.cameraVideo.onerror = (error) => {
+                console.error('Video error on Windows:', error);
+                this.showError('Camera video failed to load. Please check your camera connection.');
+            };
+
+        } catch (error) {
+            console.error('Camera error:', error);
+            const isWindows = this.detectWindows();
+            
+            if (isWindows) {
+                if (error.name === 'NotAllowedError') {
+                    this.showError('Camera access denied. Please allow camera permissions in Chrome settings and try again.');
+                } else if (error.name === 'NotFoundError') {
+                    this.showError('No camera found. Please connect a camera and try again.');
+                } else if (error.name === 'NotReadableError') {
+                    this.showError('Camera is being used by another application. Please close other apps and try again.');
+                } else if (error.name === 'OverconstrainedError') {
+                    this.showError('Camera constraints not supported. Trying with basic settings...');
+                    // Try with basic constraints
+                    this.startCameraWithBasicConstraints();
+                } else {
+                    this.showError(`Camera error: ${error.message}. Please check your camera and try again.`);
+                }
+            } else {
+                this.showError('Could not access camera. Please check permissions.');
+            }
+        }
+    }
+
+    async startCameraWithBasicConstraints() {
+        try {
+            // Basic constraints for Windows compatibility
+            this.videoStream = await navigator.mediaDevices.getUserMedia({
+                video: true
+            });
+
+            this.ui.cameraVideo.srcObject = this.videoStream;
+            
             this.ui.cameraVideo.onloadedmetadata = () => {
                 this.ui.cameraVideo.play();
                 this.cameraActive = true;
@@ -335,9 +610,9 @@ class ChromaLensPopup {
                 this.startColorDetection();
             };
 
-        } catch (error) {
-            console.error('Camera error:', error);
-            this.showError('Could not access camera. Please check permissions.');
+        } catch (basicError) {
+            console.error('Basic camera error:', basicError);
+            this.showError('Could not access camera with any settings. Please check your camera and browser permissions.');
         }
     }
 
