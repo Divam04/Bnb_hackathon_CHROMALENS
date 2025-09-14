@@ -29,3 +29,25 @@
 3. Turn on developer mode and click on "Load Unpacked"
 4. Upload the cloned repository folder and click on the reload button in the extension card in the "All Extensions" page.
 5. Run the extension through extensions section in your browser (the puzzle icon right next to the URL bar)
+
+## API used and their documentations
+
+1. EyeDropper API:
+   Purpose --> Color picking from screen
+   Documentaion -->  https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper
+   
+2. Speech Synthesis API:
+   Purpose --> Text-to-speech functionality
+   Documentaion --> https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis
+
+3. MediaDevices API:
+  Purpose --> Camera access for real-world vision
+  Documentation --> https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices
+
+4. Canvas API:
+  Purpose --> Image processing and pixel manipulation
+  Documentation --> https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API
+
+5. Chrome extension API's --> these are builtin chrome function which we can use for easier and better functionality.
+
+
