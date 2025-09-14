@@ -22,3 +22,10 @@
 - **Color Picking from Video**: Click on any part of the video to identify colors
 - **Frame Capture**: Capture filtered frames for analysis
 - **Privacy-First**: All processing happens locally, no data sent to servers
+
+## Instructions to Install 
+1. Clone the repository through `git clone`
+2. Upon cloning the repository, open your browser and enter `chrome://extensions` in your URL bar
+3. Turn on developer mode and click on "Load Unpacked"
+4. Upload the cloned repository folder and click on the reload button in the extension card in the "All Extensions" page.
+5. Run the extension through extensions section in your browser (the puzzle icon right next to the URL bar)
